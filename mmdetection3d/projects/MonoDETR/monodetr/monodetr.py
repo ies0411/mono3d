@@ -21,13 +21,15 @@ from .utils.misc import (
 
 from .backbone import build_backbone
 from .matcher import build_matcher
-from .depthaware_transformer import build_depthaware_transformer
+
+# from .depthaware_transformer import build_depthaware_transformer
 from .depth_predictor import DepthPredictor
 from .depth_predictor.ddn_loss import DDNLoss
 from .losses.focal_loss import sigmoid_focal_loss
 from .dn_components import prepare_for_dn, dn_post_process, compute_dn_loss
 from .depthaware_transformer import DepthAwareTransformer
 from .backbone import Backbone
+from .position_encoding import PositionalEncoding
 
 from mmdet3d.registry import MODELS
 
@@ -45,8 +47,9 @@ class MonoDETR(nn.Module):
         num_classes,
         num_queries,
         num_feature_levels,
-        # backbone=None,
-        # depthaware_transformer=None,  # detr
+        backbone=None,
+        pos_embedding=None,
+        depthaware_transformer=None,  # detr
         depth_predictor=None,  # foreground depth map
         aux_loss=True,
         with_box_refine=False,
@@ -70,8 +73,10 @@ class MonoDETR(nn.Module):
         super().__init__()
 
         self.num_queries = num_queries
+        print(f"depthaware_transformer : {depthaware_transformer}")
         self.depthaware_transformer = DepthAwareTransformer()
         backbone = Backbone()
+        pos_embedding = PositionalEncoding()
         self.depth_predictor = depth_predictor
         hidden_dim = self.depthaware_transformer.d_model
         self.hidden_dim = hidden_dim
@@ -161,9 +166,9 @@ class MonoDETR(nn.Module):
             nn.init.constant_(proj[0].bias, 0)
         # if two-stage, the last class_embed and bbox_embed is for region proposal generation
         num_pred = (
-            (depthaware_transformer.decoder.num_layers + 1)
+            (self.depthaware_transformer.decoder.num_layers + 1)
             if two_stage
-            else depthaware_transformer.decoder.num_layers
+            else self.depthaware_transformer.decoder.num_layers
         )
         if with_box_refine:
             self.class_embed = _get_clones(self.class_embed, num_pred)
@@ -713,79 +718,79 @@ class MLP(nn.Module):
         return x
 
 
-def build(cfg):
-    # backbone
-    backbone = build_backbone(cfg)
+# def build(cfg):
+#     # backbone
+#     backbone = build_backbone(cfg)
 
-    # detr (encoder, decoder of vis, dep)
-    depthaware_transformer = build_depthaware_transformer(cfg)
+#     # detr (encoder, decoder of vis, dep)
+#     depthaware_transformer = build_depthaware_transformer(cfg)
 
-    # depth prediction module
-    depth_predictor = DepthPredictor(cfg)
+#     # depth prediction module
+#     depth_predictor = DepthPredictor(cfg)
 
-    model = MonoDETR(
-        backbone,
-        depthaware_transformer,
-        depth_predictor,
-        num_classes=cfg["num_classes"],
-        num_queries=cfg["num_queries"],
-        aux_loss=cfg["aux_loss"],
-        num_feature_levels=cfg["num_feature_levels"],
-        with_box_refine=cfg["with_box_refine"],
-        two_stage=cfg["two_stage"],
-        init_box=cfg["init_box"],
-        use_dab=cfg["use_dab"],
-        two_stage_dino=cfg["two_stage_dino"],
-    )
+#     model = MonoDETR(
+#         backbone,
+#         depthaware_transformer,
+#         depth_predictor,
+#         num_classes=cfg["num_classes"],
+#         num_queries=cfg["num_queries"],
+#         aux_loss=cfg["aux_loss"],
+#         num_feature_levels=cfg["num_feature_levels"],
+#         with_box_refine=cfg["with_box_refine"],
+#         two_stage=cfg["two_stage"],
+#         init_box=cfg["init_box"],
+#         use_dab=cfg["use_dab"],
+#         two_stage_dino=cfg["two_stage_dino"],
+#     )
 
-    # matcher
-    matcher = build_matcher(cfg)  # decoder: matching method
+#     # matcher
+#     matcher = build_matcher(cfg)  # decoder: matching method
 
-    # loss
-    weight_dict = {"loss_ce": cfg["cls_loss_coef"], "loss_bbox": cfg["bbox_loss_coef"]}
-    weight_dict["loss_giou"] = cfg["giou_loss_coef"]
-    weight_dict["loss_dim"] = cfg["dim_loss_coef"]
-    weight_dict["loss_angle"] = cfg["angle_loss_coef"]
-    weight_dict["loss_depth"] = cfg["depth_loss_coef"]
-    weight_dict["loss_center"] = cfg["3dcenter_loss_coef"]
-    weight_dict["loss_depth_map"] = cfg["depth_map_loss_coef"]
+#     # loss
+#     weight_dict = {"loss_ce": cfg["cls_loss_coef"], "loss_bbox": cfg["bbox_loss_coef"]}
+#     weight_dict["loss_giou"] = cfg["giou_loss_coef"]
+#     weight_dict["loss_dim"] = cfg["dim_loss_coef"]
+#     weight_dict["loss_angle"] = cfg["angle_loss_coef"]
+#     weight_dict["loss_depth"] = cfg["depth_loss_coef"]
+#     weight_dict["loss_center"] = cfg["3dcenter_loss_coef"]
+#     weight_dict["loss_depth_map"] = cfg["depth_map_loss_coef"]
 
-    # dn loss
-    if cfg["use_dn"]:  # denoising 아마도
-        weight_dict["tgt_loss_ce"] = cfg["cls_loss_coef"]
-        weight_dict["tgt_loss_bbox"] = cfg["bbox_loss_coef"]
-        weight_dict["tgt_loss_giou"] = cfg["giou_loss_coef"]
-        weight_dict["tgt_loss_angle"] = cfg["angle_loss_coef"]
-        weight_dict["tgt_loss_center"] = cfg["3dcenter_loss_coef"]
+#     # dn loss
+#     if cfg["use_dn"]:  # denoising 아마도
+#         weight_dict["tgt_loss_ce"] = cfg["cls_loss_coef"]
+#         weight_dict["tgt_loss_bbox"] = cfg["bbox_loss_coef"]
+#         weight_dict["tgt_loss_giou"] = cfg["giou_loss_coef"]
+#         weight_dict["tgt_loss_angle"] = cfg["angle_loss_coef"]
+#         weight_dict["tgt_loss_center"] = cfg["3dcenter_loss_coef"]
 
-    # TODO this is a hack
-    if cfg["aux_loss"]:
-        aux_weight_dict = {}
-        for i in range(cfg["dec_layers"] - 1):
-            aux_weight_dict.update({k + f"_{i}": v for k, v in weight_dict.items()})
-        aux_weight_dict.update({k + f"_enc": v for k, v in weight_dict.items()})
-        weight_dict.update(aux_weight_dict)
-        print(f"aux_weight_dict : {aux_weight_dict}")
-    losses = [
-        "labels",
-        "boxes",
-        "cardinality",
-        "depths",
-        "dims",
-        "angles",
-        "center",
-        "depth_map",
-    ]
+#     # TODO this is a hack
+#     if cfg["aux_loss"]:
+#         aux_weight_dict = {}
+#         for i in range(cfg["dec_layers"] - 1):
+#             aux_weight_dict.update({k + f"_{i}": v for k, v in weight_dict.items()})
+#         aux_weight_dict.update({k + f"_enc": v for k, v in weight_dict.items()})
+#         weight_dict.update(aux_weight_dict)
+#         print(f"aux_weight_dict : {aux_weight_dict}")
+#     losses = [
+#         "labels",
+#         "boxes",
+#         "cardinality",
+#         "depths",
+#         "dims",
+#         "angles",
+#         "center",
+#         "depth_map",
+#     ]
 
-    criterion = SetCriterion(
-        cfg["num_classes"],
-        matcher=matcher,
-        weight_dict=weight_dict,
-        focal_alpha=cfg["focal_alpha"],
-        losses=losses,
-    )
+#     criterion = SetCriterion(
+#         cfg["num_classes"],
+#         matcher=matcher,
+#         weight_dict=weight_dict,
+#         focal_alpha=cfg["focal_alpha"],
+#         losses=losses,
+#     )
 
-    device = torch.device(cfg["device"])
-    criterion.to(device)
+#     device = torch.device(cfg["device"])
+#     criterion.to(device)
 
-    return model, criterion
+#     return model, criterion

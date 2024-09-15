@@ -73,6 +73,11 @@ model = dict(
         use_dab=False,
         two_stage_dino=False,
     ),
+    pos_embedding=dict(
+        type="PositionalEncoding",
+        hidden_dim=256,
+        position_embedding="sine",
+    ),
     backbone=dict(
         type="Backbone",
         name="resnet50",

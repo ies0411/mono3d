@@ -13,6 +13,7 @@ Various positional encodings for the transformer.
 import math
 import torch
 from torch import nn
+from mmdet3d.registry import MODELS
 
 from .utils.misc import NestedTensor
 
@@ -100,6 +101,22 @@ class PositionEmbeddingLearned(nn.Module):
         floor_coord = floor_coord.long()
         ceil_coord = (floor_coord + 1).clamp(max=49)
         return embed(floor_coord) * (1 - delta) + embed(ceil_coord) * delta
+
+
+@MODELS.register_module()
+class PositionalEncoding(nn.Module):
+    def __init__(self, hidden_dim, position_embedding):
+        super().__init__()
+        self.N_steps = hidden_dim // 2
+        self.position_embedding = position_embedding
+
+    def set_posembedding(self):
+        if self.position_embedding in ("v2", "sine"):
+            position_embedding = PositionEmbeddingSine(self.N_steps, normalize=True)
+        elif self.position_embedding in ("v3", "learned"):
+            position_embedding = PositionEmbeddingLearned(self.N_steps)
+
+        return position_embedding
 
 
 def build_position_encoding(cfg):
