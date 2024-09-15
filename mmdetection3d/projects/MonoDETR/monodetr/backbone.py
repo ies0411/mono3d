@@ -24,6 +24,8 @@ from .utils.misc import NestedTensor, is_main_process
 
 from .position_encoding import build_position_encoding
 
+from mmdet3d.registry import MODELS
+
 
 class FrozenBatchNorm2d(torch.nn.Module):
     """

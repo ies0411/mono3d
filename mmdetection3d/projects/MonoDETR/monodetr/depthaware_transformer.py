@@ -9,6 +9,7 @@ from torch.nn.init import xavier_uniform_, constant_, uniform_, normal_
 
 from .utils.misc import inverse_sigmoid
 from .ops.modules import MSDeformAttn, MSDeformAttn_cross, MultiheadAttention
+from mmdet3d.registry import MODELS
 
 
 class MLP(nn.Module):
@@ -77,6 +78,7 @@ def gen_sineembed_for_position(pos_tensor):
     return pos
 
 
+@MODELS.register_module()
 class DepthAwareTransformer(nn.Module):
     def __init__(
         self,

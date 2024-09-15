@@ -26,6 +26,8 @@ from .depth_predictor import DepthPredictor
 from .depth_predictor.ddn_loss import DDNLoss
 from .losses.focal_loss import sigmoid_focal_loss
 from .dn_components import prepare_for_dn, dn_post_process, compute_dn_loss
+from .depthaware_transformer import DepthAwareTransformer
+from .backbone import Backbone
 
 from mmdet3d.registry import MODELS
 
@@ -40,12 +42,12 @@ class MonoDETR(nn.Module):
 
     def __init__(
         self,
-        backbone,
-        depthaware_transformer,  # detr
-        depth_predictor,  # foreground depth map
         num_classes,
         num_queries,
         num_feature_levels,
+        # backbone=None,
+        # depthaware_transformer=None,  # detr
+        depth_predictor=None,  # foreground depth map
         aux_loss=True,
         with_box_refine=False,
         two_stage=False,
@@ -54,7 +56,6 @@ class MonoDETR(nn.Module):
         group_num=11,
         two_stage_dino=False,
     ):
-        print("detr@!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         """Initializes the model.
         Parameters:
             backbone: torch module of the backbone to be used. See backbone.py
@@ -69,9 +70,10 @@ class MonoDETR(nn.Module):
         super().__init__()
 
         self.num_queries = num_queries
-        self.depthaware_transformer = depthaware_transformer
+        self.depthaware_transformer = DepthAwareTransformer()
+        backbone = Backbone()
         self.depth_predictor = depth_predictor
-        hidden_dim = depthaware_transformer.d_model
+        hidden_dim = self.depthaware_transformer.d_model
         self.hidden_dim = hidden_dim
         self.num_feature_levels = num_feature_levels
         self.two_stage_dino = two_stage_dino
@@ -102,7 +104,6 @@ class MonoDETR(nn.Module):
             else:
                 self.tgt_embed = nn.Embedding(num_queries * group_num, hidden_dim)
                 self.refpoint_embed = nn.Embedding(num_queries * group_num, 6)
-
         if num_feature_levels > 1:
             num_backbone_outs = len(backbone.strides)
             input_proj_list = []
