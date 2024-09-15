@@ -1,0 +1,29 @@
+# folders or files
+datasets/*
+.vscode/
+.ipynb_checkpoints/
+.idea/
+output/
+cubercnn/external/
+
+# filetypes
+*.pyc
+*.mexa64
+*/output/*
+*/output*/*
+*~
+*.so
+*.ipynb
+
+datasets/pandaset
+datasets/*
+*/__pycache__/*
+__pycache__/*
+outputs/*
+logs/*
+data/*
+
+data/*
+
+*/build/*
+*/__pycache__/*
