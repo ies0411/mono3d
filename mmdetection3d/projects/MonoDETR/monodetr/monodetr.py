@@ -73,26 +73,29 @@ class MonoDETR(nn.Module):
         super().__init__()
 
         self.num_queries = num_queries
-        print(f"depthaware_transformer : {depthaware_transformer}")
-        self.depthaware_transformer = DepthAwareTransformer(
-            d_model=depthaware_transformer["d_model"],
-            nhead=depthaware_transformer["nhead"],
-            num_encoder_layers=depthaware_transformer["num_encoder_layers"],
-            num_decoder_layers=depthaware_transformer["num_decoder_layers"],
-            dim_feedforward=depthaware_transformer["dim_feedforward"],
-            activation=depthaware_transformer["activation"],
-            return_intermediate_dec=depthaware_transformer["return_intermediate_dec"],
-            num_feature_levels=depthaware_transformer["num_feature_levels"],
-            dec_n_points=depthaware_transformer["dec_n_points"],
-            enc_n_points=depthaware_transformer["enc_n_points"],
-            two_stage=depthaware_transformer["two_stage"],
-            two_stage_num_proposals=depthaware_transformer["two_stage_num_proposals"],
-            group_num=depthaware_transformer["group_num"],
-            use_dab=depthaware_transformer["use_dab"],
-            two_stage_dino=depthaware_transformer["two_stage_dino"],
-        )
-        backbone = Backbone()
-        pos_embedding = PositionalEncoding()
+        self.depthaware_transformer = MODELS.build(depthaware_transformer)
+        self.backbone = MODELS.build(backbone)
+        self.pos_embedding = MODELS.build(pos_embedding)
+        print("========================")
+        # self.depthaware_transformer = DepthAwareTransformer(
+        #     d_model=depthaware_transformer["d_model"],
+        #     nhead=depthaware_transformer["nhead"],
+        #     num_encoder_layers=depthaware_transformer["num_encoder_layers"],
+        #     num_decoder_layers=depthaware_transformer["num_decoder_layers"],
+        #     dim_feedforward=depthaware_transformer["dim_feedforward"],
+        #     activation=depthaware_transformer["activation"],
+        #     return_intermediate_dec=depthaware_transformer["return_intermediate_dec"],
+        #     num_feature_levels=depthaware_transformer["num_feature_levels"],
+        #     dec_n_points=depthaware_transformer["dec_n_points"],
+        #     enc_n_points=depthaware_transformer["enc_n_points"],
+        #     two_stage=depthaware_transformer["two_stage"],
+        #     two_stage_num_proposals=depthaware_transformer["two_stage_num_proposals"],
+        #     group_num=depthaware_transformer["group_num"],
+        #     use_dab=depthaware_transformer["use_dab"],
+        #     two_stage_dino=depthaware_transformer["two_stage_dino"],
+        # )
+        # backbone = Backbone()
+        # pos_embedding = PositionalEncoding()
         self.depth_predictor = depth_predictor
         hidden_dim = self.depthaware_transformer.d_model
         self.hidden_dim = hidden_dim
