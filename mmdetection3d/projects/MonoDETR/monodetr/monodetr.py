@@ -19,7 +19,7 @@ from .utils.misc import (
     inverse_sigmoid,
 )
 
-from .backbone import build_backbone
+# from .backbone import build_backbone
 from .matcher import build_matcher
 
 # from .depthaware_transformer import build_depthaware_transformer
@@ -27,11 +27,14 @@ from .depth_predictor import DepthPredictor
 from .depth_predictor.ddn_loss import DDNLoss
 from .losses.focal_loss import sigmoid_focal_loss
 from .dn_components import prepare_for_dn, dn_post_process, compute_dn_loss
-from .depthaware_transformer import DepthAwareTransformer
-from .backbone import Backbone
-from .position_encoding import PositionalEncoding
 
+from .depthaware_transformer import DepthAwareTransformer
+
+# from .backbone import Backbone
+# from .position_encoding import PositionalEncoding
+from .backbone import Joiner
 from mmdet3d.registry import MODELS
+from mmdet3d.models.detectors.mvx_two_stage import MVXTwoStageDetector
 
 
 def _get_clones(module, N):
@@ -39,7 +42,7 @@ def _get_clones(module, N):
 
 
 @MODELS.register_module()
-class MonoDETR(nn.Module):
+class MonoDETR(MVXTwoStageDetector):
     """This is the MonoDETR module that performs monocualr 3D object detection"""
 
     def __init__(
@@ -51,6 +54,7 @@ class MonoDETR(nn.Module):
         pos_embedding=None,
         depthaware_transformer=None,  # detr
         depth_predictor=None,  # foreground depth map
+        train_cfg=None,
         aux_loss=True,
         with_box_refine=False,
         two_stage=False,
@@ -71,32 +75,16 @@ class MonoDETR(nn.Module):
             two_stage: two-stage MonoDETR
         """
         super().__init__()
-
+        self.train_cfg = train_cfg
         self.num_queries = num_queries
         self.depthaware_transformer = MODELS.build(depthaware_transformer)
-        self.backbone = MODELS.build(backbone)
-        self.pos_embedding = MODELS.build(pos_embedding)
+        backbone = MODELS.build(backbone)
+        pos_embedding = MODELS.build(pos_embedding)
+        self.backbone = Joiner(backbone, pos_embedding)
+        self.depth_predictor = MODELS.build(depth_predictor)
+
         print("========================")
-        # self.depthaware_transformer = DepthAwareTransformer(
-        #     d_model=depthaware_transformer["d_model"],
-        #     nhead=depthaware_transformer["nhead"],
-        #     num_encoder_layers=depthaware_transformer["num_encoder_layers"],
-        #     num_decoder_layers=depthaware_transformer["num_decoder_layers"],
-        #     dim_feedforward=depthaware_transformer["dim_feedforward"],
-        #     activation=depthaware_transformer["activation"],
-        #     return_intermediate_dec=depthaware_transformer["return_intermediate_dec"],
-        #     num_feature_levels=depthaware_transformer["num_feature_levels"],
-        #     dec_n_points=depthaware_transformer["dec_n_points"],
-        #     enc_n_points=depthaware_transformer["enc_n_points"],
-        #     two_stage=depthaware_transformer["two_stage"],
-        #     two_stage_num_proposals=depthaware_transformer["two_stage_num_proposals"],
-        #     group_num=depthaware_transformer["group_num"],
-        #     use_dab=depthaware_transformer["use_dab"],
-        #     two_stage_dino=depthaware_transformer["two_stage_dino"],
-        # )
-        # backbone = Backbone()
-        # pos_embedding = PositionalEncoding()
-        self.depth_predictor = depth_predictor
+
         hidden_dim = self.depthaware_transformer.d_model
         self.hidden_dim = hidden_dim
         self.num_feature_levels = num_feature_levels
@@ -129,10 +117,10 @@ class MonoDETR(nn.Module):
                 self.tgt_embed = nn.Embedding(num_queries * group_num, hidden_dim)
                 self.refpoint_embed = nn.Embedding(num_queries * group_num, 6)
         if num_feature_levels > 1:
-            num_backbone_outs = len(backbone.strides)
+            num_backbone_outs = len(self.backbone.strides)
             input_proj_list = []
             for _ in range(num_backbone_outs):
-                in_channels = backbone.num_channels[_]
+                in_channels = self.backbone.num_channels[_]
                 input_proj_list.append(
                     nn.Sequential(
                         nn.Conv2d(in_channels, hidden_dim, kernel_size=1),
@@ -154,13 +142,14 @@ class MonoDETR(nn.Module):
             self.input_proj = nn.ModuleList(
                 [
                     nn.Sequential(
-                        nn.Conv2d(backbone.num_channels[0], hidden_dim, kernel_size=1),
+                        nn.Conv2d(
+                            self.backbone.num_channels[0], hidden_dim, kernel_size=1
+                        ),
                         nn.GroupNorm(32, hidden_dim),
                     )
                 ]
             )
 
-        self.backbone = backbone
         self.aux_loss = aux_loss
         self.with_box_refine = with_box_refine
         self.two_stage = two_stage
@@ -221,13 +210,14 @@ class MonoDETR(nn.Module):
             self.depthaware_transformer.decoder.class_embed = self.class_embed
             for box_embed in self.bbox_embed:
                 nn.init.constant_(box_embed.layers[-1].bias.data[2:], 0.0)
+        print("======complete=============")
 
     def forward(self, images, calibs, targets, img_sizes, dn_args=None):
         """The forward expects a NestedTensor, which consists of:
         - samples.tensor: batched images, of shape [batch_size x 3 x H x W]
         - samples.mask: a binary mask of shape [batch_size x H x W], containing 1 on padded pixels
         """
-
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!forward")
         features, pos = self.backbone(images)
 
         srcs = []
