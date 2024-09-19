@@ -144,15 +144,15 @@ train_pipeline = [
     ),
     dict(type="ObjectRangeFilter", point_cloud_range=point_cloud_range),
     dict(type="ObjectNameFilter", classes=class_names),
-    dict(type="ResizeCropFlipImage", data_aug_conf=ida_aug_conf, training=True),
-    dict(
-        type="GlobalRotScaleTransImage",
-        rot_range=[-0.3925, 0.3925],
-        translation_std=[0, 0, 0],
-        scale_ratio_range=[0.95, 1.05],
-        reverse_angle=False,
-        training=True,
-    ),
+    # dict(type="ResizeCropFlipImage", data_aug_conf=ida_aug_conf, training=True),
+    # dict(
+    #     type="GlobalRotScaleTransImage",
+    #     rot_range=[-0.3925, 0.3925],
+    #     translation_std=[0, 0, 0],
+    #     scale_ratio_range=[0.95, 1.05],
+    #     reverse_angle=False,
+    #     training=True,
+    # ),
     dict(
         type="Pack3DDetInputs",
         keys=[
