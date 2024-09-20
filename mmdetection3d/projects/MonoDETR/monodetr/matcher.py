@@ -15,7 +15,10 @@ from .utils.box_ops import (
     box_cxcylrtb_to_xyxy,
 )
 
+from mmdet3d.registry import MODELS
 
+
+@MODELS.register_module()
 class HungarianMatcher(nn.Module):
     """This class computes an assignment between the targets and the predictions of the network
     For efficiency reasons, the targets don't include the no_object. Because of this, in general,
@@ -25,10 +28,10 @@ class HungarianMatcher(nn.Module):
 
     def __init__(
         self,
-        cost_class: float = 1,
-        cost_3dcenter: float = 1,
-        cost_bbox: float = 1,
-        cost_giou: float = 1,
+        cost_class=2,
+        cost_3dcenter=10,
+        cost_bbox=5,
+        cost_giou=2,
     ):
         """Creates the matcher
         Params:
@@ -143,10 +146,10 @@ class HungarianMatcher(nn.Module):
         ]
 
 
-def build_matcher(cfg):
-    return HungarianMatcher(
-        cost_class=cfg["set_cost_class"],
-        cost_bbox=cfg["set_cost_bbox"],
-        cost_3dcenter=cfg["set_cost_3dcenter"],
-        cost_giou=cfg["set_cost_giou"],
-    )
+# def build_matcher(cfg):
+#     return HungarianMatcher(
+#         cost_class=cfg["set_cost_class"],
+#         cost_bbox=cfg["set_cost_bbox"],
+#         cost_3dcenter=cfg["set_cost_3dcenter"],
+#         cost_giou=cfg["set_cost_giou"],
+#     )
