@@ -73,18 +73,18 @@ model = dict(
         return_interm_layers=True,
         dilation=False,
     ),
-    matcher=dict(
+    assigner=dict(
         type="HungarianMatcher",
         cost_class=2,
         cost_3dcenter=10,
         cost_bbox=5,
         cost_giou=2,
     ),
-    loss=dict(
-        type="SetCriterion",
-        num_classes=3,
-        focal_alpha=0.25,
-    ),
+    # loss=dict(
+    #     type="SetCriterion",
+    #     num_classes=3,
+    #     focal_alpha=0.25,
+    # ),
 )
 # data_root = "data/nuscenes/"
 

@@ -79,9 +79,11 @@ class MonoDETR(MVXTwoStageDetector):
         num_feature_levels,
         backbone=None,
         pos_embedding=None,
-        matcher=None,
+        head=None,
         depthaware_transformer=None,  # detr
         depth_predictor=None,  # foreground depth map
+        # pts_bbox_head=None,
+        assigner=None,
         train_cfg=None,
         aux_loss=True,
         with_box_refine=False,
@@ -110,7 +112,8 @@ class MonoDETR(MVXTwoStageDetector):
         pos_embedding = MODELS.build(pos_embedding)
         self.backbone = Joiner(backbone, pos_embedding)
         self.depth_predictor = MODELS.build(depth_predictor)
-        self.matcher = MODELS.build(matcher)
+        # self.head = MODELS.build(head)
+        self.assigner = MODELS.build(assigner)
 
         print("========================")
 
@@ -241,7 +244,10 @@ class MonoDETR(MVXTwoStageDetector):
                 nn.init.constant_(box_embed.layers[-1].bias.data[2:], 0.0)
         print("======complete=============")
 
-    def loss(self):
+    def loss(self, batch_inputs_dict, batch_data_samples, **kwargs):
+        # def loss(self, batch_inputs_dict: Dict[List, torch.Tensor],
+        #  batch_data_samples: List[Det3DDataSample],
+        #  **kwargs) -> List[Det3DDataSample]:
         # loss
         weight_dict = {
             "loss_ce": cfg["cls_loss_coef"],
@@ -263,9 +269,9 @@ class MonoDETR(MVXTwoStageDetector):
             weight_dict["tgt_loss_center"] = cfg["3dcenter_loss_coef"]
 
         # TODO this is a hack
-        if cfg["aux_loss"]:
+        if True:
             aux_weight_dict = {}
-            for i in range(cfg["dec_layers"] - 1):
+            for i in range(3 - 1):
                 aux_weight_dict.update({k + f"_{i}": v for k, v in weight_dict.items()})
             aux_weight_dict.update({k + f"_enc": v for k, v in weight_dict.items()})
             weight_dict.update(aux_weight_dict)
@@ -282,10 +288,10 @@ class MonoDETR(MVXTwoStageDetector):
         ]
 
         criterion = SetCriterion(
-            cfg["num_classes"],
-            matcher=matcher,
+            3,
+            matcher=self.assigner,
             weight_dict=weight_dict,
-            focal_alpha=cfg["focal_alpha"],
+            focal_alpha=0.25,
             losses=losses,
         )
         return criterion
