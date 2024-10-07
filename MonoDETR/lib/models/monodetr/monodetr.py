@@ -198,7 +198,10 @@ class MonoDETR(nn.Module):
         - samples.tensor: batched images, of shape [batch_size x 3 x H x W]
         - samples.mask: a binary mask of shape [batch_size x H x W], containing 1 on padded pixels
         """
-
+        print(f"images : {images}")
+        print(f"calibs : {calibs}")
+        print(f"targets : {targets}")
+        print(f"img_sizes : {img_sizes}")
         features, pos = self.backbone(images)
 
         srcs = []
