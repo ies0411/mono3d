@@ -35,5 +35,5 @@ docker run --ipc=host --shm-size=8gb --pid=host \
         -v ${HOME}:${HOME} \
         ${GPUS_ARGS} \
         -p 4${PORT}:8888 \
-        --name ${USER}.${IMAGE_NAME_} \
+        --name ${USER}.${IMAGE_NAME_}.${PORT} \
         ${IMAGE_NAME} ${COMMAND}

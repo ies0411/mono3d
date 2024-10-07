@@ -83,6 +83,7 @@ class MonoDETR(MVXTwoStageDetector):
         depthaware_transformer=None,  # detr
         depth_predictor=None,  # foreground depth map
         # pts_bbox_head=None,
+        criterion=None,
         assigner=None,
         train_cfg=None,
         aux_loss=True,
@@ -115,6 +116,11 @@ class MonoDETR(MVXTwoStageDetector):
         # self.head = MODELS.build(head)
         self.assigner = MODELS.build(assigner)
 
+        self.criterion = SetCriterion(
+            num_classes=3,
+            matcher=self.assigner,
+            focal_alpha=0.25,
+        )
         print("========================")
 
         hidden_dim = self.depthaware_transformer.d_model
@@ -245,56 +251,55 @@ class MonoDETR(MVXTwoStageDetector):
         print("======complete=============")
 
     def loss(self, batch_inputs_dict, batch_data_samples, **kwargs):
-        # def loss(self, batch_inputs_dict: Dict[List, torch.Tensor],
-        #  batch_data_samples: List[Det3DDataSample],
-        #  **kwargs) -> List[Det3DDataSample]:
-        # loss
-        weight_dict = {
-            "loss_ce": cfg["cls_loss_coef"],
-            "loss_bbox": cfg["bbox_loss_coef"],
-        }
-        weight_dict["loss_giou"] = cfg["giou_loss_coef"]
-        weight_dict["loss_dim"] = cfg["dim_loss_coef"]
-        weight_dict["loss_angle"] = cfg["angle_loss_coef"]
-        weight_dict["loss_depth"] = cfg["depth_loss_coef"]
-        weight_dict["loss_center"] = cfg["3dcenter_loss_coef"]
-        weight_dict["loss_depth_map"] = cfg["depth_map_loss_coef"]
 
-        # dn loss
-        if cfg["use_dn"]:  # denoising 아마도
-            weight_dict["tgt_loss_ce"] = cfg["cls_loss_coef"]
-            weight_dict["tgt_loss_bbox"] = cfg["bbox_loss_coef"]
-            weight_dict["tgt_loss_giou"] = cfg["giou_loss_coef"]
-            weight_dict["tgt_loss_angle"] = cfg["angle_loss_coef"]
-            weight_dict["tgt_loss_center"] = cfg["3dcenter_loss_coef"]
+        img = batch_inputs_dict["imgs"]
+        batch_img_metas = [ds.metainfo for ds in batch_data_samples]
+        batch_gt_instances_3d = [ds.gt_instances_3d for ds in batch_data_samples]
+        gt_bboxes_3d = [gt.bboxes_3d for gt in batch_gt_instances_3d]
+        gt_labels_3d = [gt.labels_3d for gt in batch_gt_instances_3d]
+        gt_bboxes_ignore = None
 
-        # TODO this is a hack
-        if True:
-            aux_weight_dict = {}
-            for i in range(3 - 1):
-                aux_weight_dict.update({k + f"_{i}": v for k, v in weight_dict.items()})
-            aux_weight_dict.update({k + f"_enc": v for k, v in weight_dict.items()})
-            weight_dict.update(aux_weight_dict)
-            print(f"aux_weight_dict : {aux_weight_dict}")
-        losses = [
-            "labels",
-            "boxes",
-            "cardinality",
-            "depths",
-            "dims",
-            "angles",
-            "center",
-            "depth_map",
-        ]
+        img_size = batch_data_samples["img_shape"]
 
-        criterion = SetCriterion(
-            3,
-            matcher=self.assigner,
-            weight_dict=weight_dict,
-            focal_alpha=0.25,
-            losses=losses,
-        )
-        return criterion
+        ########
+        inputs = inputs.to(self.device)
+        calibs = calibs.to(self.device)
+        for key in targets.keys():
+            targets[key] = targets[key].to(self.device)
+        img_sizes = targets["img_size"]
+
+        targets = self.prepare_targets(targets, inputs.shape[0])
+        ##dn
+        dn_args = None
+        if self.cfg["use_dn"]:
+            dn_args = (
+                targets,
+                self.cfg["scalar"],
+                self.cfg["label_noise_scale"],
+                self.cfg["box_noise_scale"],
+                self.cfg["num_patterns"],
+            )
+        ###
+        # train one batch
+        self.optimizer.zero_grad()
+        outputs = self.model(inputs, calibs, targets, img_sizes, dn_args=dn_args)
+        mask_dict = None
+        # ipdb.set_trace()
+        detr_losses_dict = self.detr_loss(outputs, targets, mask_dict)
+
+        # batch_img_metas = self.add_lidar2img(img, batch_img_metas)
+
+        # img_feats = self.extract_feat(img=img, img_metas=batch_img_metas)
+
+        # print(batch_inputs_dict)
+        # # img,
+        # print("==")
+        # print(batch_data_samples)
+        # print("==")
+        # print(kwargs)
+        # return self.criterion(batch_data_samples, batch_inputs_dict, kwargs)
+
+        # return criterion
 
     def predict(self, inputs=None, data_samples=None, mode=None, **kwargs):
 

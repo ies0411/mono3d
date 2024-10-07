@@ -2,6 +2,7 @@ from torch import nn
 import torch
 import torch.nn.functional as F
 from mmdet3d.registry import MODELS
+from mmdet.models.losses.utils import weighted_loss
 
 from .depth_predictor.ddn_loss import DDNLoss
 from .losses.focal_loss import sigmoid_focal_loss
@@ -9,7 +10,55 @@ from .utils.misc import accuracy, is_dist_avail_and_initialized, get_world_size
 from .utils import box_ops
 
 
-# @MODELS.register_module()
+# def set_criterion(self):
+#     weight_dict = {
+#         "loss_ce": cfg["cls_loss_coef"],
+#         "loss_bbox": cfg["bbox_loss_coef"],
+#     }
+#     weight_dict["loss_giou"] = cfg["giou_loss_coef"]
+#     weight_dict["loss_dim"] = cfg["dim_loss_coef"]
+#     weight_dict["loss_angle"] = cfg["angle_loss_coef"]
+#     weight_dict["loss_depth"] = cfg["depth_loss_coef"]
+#     weight_dict["loss_center"] = cfg["3dcenter_loss_coef"]
+#     weight_dict["loss_depth_map"] = cfg["depth_map_loss_coef"]
+
+#     # dn loss
+#     if cfg["use_dn"]:  # denoising 아마도
+#         weight_dict["tgt_loss_ce"] = cfg["cls_loss_coef"]
+#         weight_dict["tgt_loss_bbox"] = cfg["bbox_loss_coef"]
+#         weight_dict["tgt_loss_giou"] = cfg["giou_loss_coef"]
+#         weight_dict["tgt_loss_angle"] = cfg["angle_loss_coef"]
+#         weight_dict["tgt_loss_center"] = cfg["3dcenter_loss_coef"]
+
+#     # TODO this is a hack
+#     if True:
+#         aux_weight_dict = {}
+#         for i in range(3 - 1):
+#             aux_weight_dict.update({k + f"_{i}": v for k, v in weight_dict.items()})
+#         aux_weight_dict.update({k + f"_enc": v for k, v in weight_dict.items()})
+#         weight_dict.update(aux_weight_dict)
+#         print(f"aux_weight_dict : {aux_weight_dict}")
+#     losses = [
+#         "labels",
+#         "boxes",
+#         "cardinality",
+#         "depths",
+#         "dims",
+#         "angles",
+#         "center",
+#         "depth_map",
+#     ]
+
+#     criterion = SetCriterion(
+#         3,
+#         matcher=self.assigner,
+#         weight_dict=weight_dict,
+#         focal_alpha=0.25,
+#         losses=losses,
+#     )
+
+
+@MODELS.register_module()
 class SetCriterion(nn.Module):
     """This class computes the loss for MonoDETR.
     The process happens in two steps:
@@ -18,7 +67,24 @@ class SetCriterion(nn.Module):
     """
 
     def __init__(
-        self, num_classes, matcher, weight_dict, focal_alpha, losses, group_num=11
+        self,
+        num_classes,
+        matcher,
+        # weight_dict,
+        focal_alpha,
+        # losses,
+        cls_loss_coef=2,
+        bbox_loss_coef=2,
+        giou_loss_coef=2,
+        dim_loss_coef=1,
+        angle_loss_coef=1,
+        depth_loss_coef=1,
+        center3d_loss_coef=10,
+        depth_map_loss_coef=1,
+        dec_layers=3,
+        use_dn=False,
+        aux_loss=True,
+        group_num=11,
     ):
         """Create the criterion.
         Parameters:
@@ -28,14 +94,54 @@ class SetCriterion(nn.Module):
             losses: list of all the losses to be applied. See get_loss for list of available losses.
             focal_alpha: alpha in Focal Loss
         """
+
         super().__init__()
         self.num_classes = num_classes
         self.matcher = matcher
-        self.weight_dict = weight_dict
-        self.losses = losses
+        # self.weight_dict = weight_dict
+        # self.losses = losses
         self.focal_alpha = focal_alpha
         self.ddn_loss = DDNLoss()  # for depth map
         self.group_num = group_num
+
+        weight_dict = {
+            "loss_ce": cls_loss_coef,
+            "loss_bbox": bbox_loss_coef,
+        }
+        weight_dict["loss_giou"] = giou_loss_coef
+        weight_dict["loss_dim"] = dim_loss_coef
+        weight_dict["loss_angle"] = angle_loss_coef
+        weight_dict["loss_depth"] = depth_loss_coef
+        weight_dict["loss_center"] = center3d_loss_coef
+        weight_dict["loss_depth_map"] = depth_map_loss_coef
+
+        # dn loss
+        if use_dn:  # denoising 아마도
+            weight_dict["tgt_loss_ce"] = cls_loss_coef
+            weight_dict["tgt_loss_bbox"] = bbox_loss_coef
+            weight_dict["tgt_loss_giou"] = giou_loss_coef
+            weight_dict["tgt_loss_angle"] = angle_loss_coef
+
+        # TODO this is a hack
+        if aux_loss:
+            aux_weight_dict = {}
+            for i in range(dec_layers - 1):
+                aux_weight_dict.update({k + f"_{i}": v for k, v in weight_dict.items()})
+            aux_weight_dict.update({k + f"_enc": v for k, v in weight_dict.items()})
+            weight_dict.update(aux_weight_dict)
+            print(f"aux_weight_dict : {aux_weight_dict}")
+        losses = [
+            "labels",
+            "boxes",
+            "cardinality",
+            "depths",
+            "dims",
+            "angles",
+            "center",
+            "depth_map",
+        ]
+        self.losses = losses
+        self.weight_dict = weight_dict
 
     def loss_labels(self, outputs, targets, indices, num_boxes, log=True):
         """Classification loss (Binary focal loss)
@@ -139,6 +245,19 @@ class SetCriterion(nn.Module):
         )
         losses["loss_giou"] = loss_giou.sum() / num_boxes
         return losses
+
+    def _forward(self, mode="loss", **kwargs):
+        """Calls either forward_train or forward_test depending on whether
+        return_loss=True.
+
+        Note this setting will change the expected inputs. When
+        `return_loss=True`, img and img_metas are single-nested (i.e.
+        torch.Tensor and list[dict]), and when `resturn_loss=False`, img and
+        img_metas should be double nested (i.e.  list[torch.Tensor],
+        list[list[dict]]), with the outer list indicating test time
+        augmentations.
+        """
+        raise NotImplementedError("tensor mode is yet to add")
 
     def loss_depths(self, outputs, targets, indices, num_boxes):
 
