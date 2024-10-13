@@ -198,12 +198,12 @@ class MonoDETR(nn.Module):
         - samples.tensor: batched images, of shape [batch_size x 3 x H x W]
         - samples.mask: a binary mask of shape [batch_size x H x W], containing 1 on padded pixels
         """
-        print(f"images : {images}")
-        print(f"calibs : {calibs}")
-        print(f"targets : {targets}")
-        print(f"img_sizes : {img_sizes}")
+        # print(f"images : {images}")
+        # print(f"calibs : {calibs}")
+        # print(f"targets : {targets}")
+        # print(f"img_sizes : {img_sizes}")
         features, pos = self.backbone(images)
-
+        print(f"features : {features}")
         srcs = []
         masks = []
         for l, feat in enumerate(features):
@@ -211,11 +211,13 @@ class MonoDETR(nn.Module):
             srcs.append(self.input_proj[l](src))
             masks.append(mask)
             assert mask is not None
-
+            print(f"feat size : {feat.tensors.size()}")
+        # print(f"len src : {len(srcs)}")
         if self.num_feature_levels > len(srcs):
             _len_srcs = len(srcs)
             for l in range(_len_srcs, self.num_feature_levels):
                 if l == _len_srcs:
+                    # print(f"feature : {features[-1].tensors}")
                     src = self.input_proj[l](features[-1].tensors)
                 else:
                     src = self.input_proj[l](srcs[-1])
@@ -425,11 +427,14 @@ class SetCriterion(nn.Module):
         """
         assert "pred_logits" in outputs
         src_logits = outputs["pred_logits"]
-
         idx = self._get_src_permutation_idx(indices)
+        print(f"indices : {indices}")
+        print(f"idx : {idx}")
+
         target_classes_o = torch.cat(
             [t["labels"][J] for t, (_, J) in zip(targets, indices)]
         )
+        print(f"target_classes_o: {target_classes_o}")
         target_classes = torch.full(
             src_logits.shape[:2],
             self.num_classes,
@@ -604,6 +609,8 @@ class SetCriterion(nn.Module):
             [80, 24, 80, 24], device="cuda"
         )
         gt_boxes2d = box_ops.box_cxcywh_to_xyxy(gt_boxes2d)
+        print([t["depth"] for t in targets])
+        print(f'depth : {torch.cat([t["depth"] for t in targets], dim=0)}')
         gt_center_depth = torch.cat([t["depth"] for t in targets], dim=0).squeeze(dim=1)
 
         losses = dict()
