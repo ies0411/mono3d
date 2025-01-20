@@ -61,7 +61,7 @@ class Trainer(object):
                 logger=self.logger)
             self.lr_scheduler.last_epoch = self.epoch - 1
             self.logger.info("Loading Checkpoint... Best Result:{}, Best Epoch:{}".format(self.best_result, self.best_epoch))
-        
+
     def train(self):
         start_epoch = self.epoch
 
@@ -89,7 +89,7 @@ class Trainer(object):
                     ckpt_name = os.path.join(self.output_dir, 'checkpoint_epoch_%d' % self.epoch)
                 else:
                     ckpt_name = os.path.join(self.output_dir, 'checkpoint')
-               
+
                 save_checkpoint(
                     get_checkpoint_state(self.model, self.optimizer, self.epoch, best_result, best_epoch),
                     ckpt_name)
@@ -154,7 +154,7 @@ class Trainer(object):
             flags = [True] * 5
             if batch_idx % 30 == 0:
                 print("----", batch_idx, "----")
-                print("%s: %.2f, " %("loss_detr", detr_losses_dict_log["loss_detr"]))
+                # print("%s: %.2f, " %("loss_detr", detr_losses_dict_log["loss_detr"]))
                 for key, val in detr_losses_dict_log.items():
                     if key == "loss_detr":
                         continue

@@ -27,3 +27,6 @@ data/*
 
 */build/*
 */__pycache__/*
+*.o
+*.egg
+MonoDETR/lib/models/monodetr/ops/dist/MultiScaleDeformableAttention-1.0-py3.7-linux-x86_64.egg

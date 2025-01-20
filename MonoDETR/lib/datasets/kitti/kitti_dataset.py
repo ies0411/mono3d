@@ -259,18 +259,18 @@ class KITTI_Dataset(data.Dataset):
                 dtype=np.float32,
             )  # W * H
             corner_2d = bbox_2d.copy()
-            print(f"pos : {objects[i].pos}")
+            # print(f"pos : {objects[i].pos}")
             center_3d = objects[i].pos + [
                 0,
                 -objects[i].h / 2,
                 0,
             ]  # real 3D center in 3D space
-            print(f"center3d!!1 : {center_3d}")
+            # print(f"center3d!!1 : {center_3d}")
             center_3d = center_3d.reshape(-1, 3)  # shape adjustment (N, 3)
             center_3d, _ = calib.rect_to_img(
                 center_3d
             )  # project 3D center to image plane
-            print(f"center_3d : {center_3d}")
+            # print(f"center_3d : {center_3d}")
             center_3d = center_3d[0]  # shape adjustment
             if random_flip_flag and not self.aug_calib:  # random flip for center3d
                 center_3d[0] = img_size[0] - center_3d[0]
@@ -384,7 +384,7 @@ class KITTI_Dataset(data.Dataset):
             "img_size": img_size,
             "bbox_downsample_ratio": img_size / features_size,
         }
-        print(f"img_size : {img_size}")
+        # print(f"img_size : {img_size}")
         return inputs, calib.P2, targets, info
 
 

@@ -72,7 +72,7 @@ class HungarianMatcher(nn.Module):
         )  # [batch_size * num_queries, num_classes]
         # Also concat the target labels and boxes
         tgt_ids = torch.cat([v["labels"] for v in targets]).long()
-        print(f"tgt_ids : {tgt_ids}")
+        # print(f"tgt_ids : {tgt_ids}")
         # Compute the classification cost.
         alpha = 0.25
         gamma = 2.0
@@ -80,15 +80,15 @@ class HungarianMatcher(nn.Module):
             (1 - alpha) * (out_prob**gamma) * (-(1 - out_prob + 1e-8).log())
         )
         pos_cost_class = alpha * ((1 - out_prob) ** gamma) * (-(out_prob + 1e-8).log())
-        print(f"pos_cost_class : {pos_cost_class}")
+        # print(f"pos_cost_class : {pos_cost_class}")
         cost_class = pos_cost_class[:, tgt_ids] - neg_cost_class[:, tgt_ids]
 
         out_3dcenter = outputs["pred_boxes"][:, :, 0:2].flatten(
             0, 1
         )  # [batch_size * num_queries, 4]
         tgt_3dcenter = torch.cat([v["boxes_3d"][:, 0:2] for v in targets])
-        print(f"tgt_3dcenter : {tgt_3dcenter}")
-        print(f"out_3dcenter : {out_3dcenter}")
+        # print(f"tgt_3dcenter : {tgt_3dcenter}")
+        # print(f"out_3dcenter : {out_3dcenter}")
         # Compute the 3dcenter cost between boxes
         cost_3dcenter = torch.cdist(out_3dcenter, tgt_3dcenter, p=1)
 
@@ -103,11 +103,11 @@ class HungarianMatcher(nn.Module):
         # Compute the giou cost betwen boxes
         out_bbox = outputs["pred_boxes"].flatten(0, 1)  # [batch_size * num_queries, 4]
         tgt_bbox = torch.cat([v["boxes_3d"] for v in targets])
-        print(f"tgt_bbox : {tgt_bbox}")
+        # print(f"tgt_bbox : {tgt_bbox}")
         cost_giou = -generalized_box_iou(
             box_cxcylrtb_to_xyxy(out_bbox), box_cxcylrtb_to_xyxy(tgt_bbox)
         )
-        print(f"cost_giou : {cost_giou}")
+        # print(f"cost_giou : {cost_giou}")
         # Final cost matrix
         C = (
             self.cost_bbox * cost_bbox
@@ -118,7 +118,7 @@ class HungarianMatcher(nn.Module):
         C = C.view(bs, num_queries, -1).cpu()
 
         sizes = [len(v["boxes"]) for v in targets]
-        print(f"sizes : {sizes}")
+        # print(f"sizes : {sizes}")
         # indices = [linear_sum_assignment(c[i]) for i, c in enumerate(C.split(sizes, -1))]
         indices = []
         g_num_queries = num_queries // group_num
