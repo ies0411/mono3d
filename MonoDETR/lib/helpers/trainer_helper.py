@@ -175,17 +175,17 @@ class Trainer(object):
             mask_dict = None
             # ipdb.set_trace()
             detr_losses_dict = self.detr_loss(outputs, targets, mask_dict)
-            print(f"detr_losses_dict : {detr_losses_dict}")
+            # print(f"detr_losses_dict : {detr_losses_dict}")
             print(detr_losses_dict.keys())
             weight_dict = self.detr_loss.weight_dict
-            print(f"weight_dict : {weight_dict}")
+            # print(f"weight_dict : {weight_dict}")
             detr_losses_dict_weighted = [
                 detr_losses_dict[k] * weight_dict[k]
                 for k in detr_losses_dict.keys()
                 if k in weight_dict
             ]
             detr_losses = sum(detr_losses_dict_weighted)
-            print(f"detr_losses : {detr_losses}")
+            # print(f"detr_losses : {detr_losses}")
             detr_losses_dict = misc.reduce_dict(detr_losses_dict)
             detr_losses_dict_log = {}
             detr_losses_log = 0

@@ -439,7 +439,7 @@ class SetCriterion(nn.Module):
         )
 
         target_classes[idx] = target_classes_o.squeeze().long()
-        print(target_classes[idx])
+        # print(target_classes[idx])
         target_classes_onehot = torch.zeros(
             [src_logits.shape[0], src_logits.shape[1], src_logits.shape[2] + 1],
             dtype=src_logits.dtype,
